@@ -1,19 +1,30 @@
 import AppKit
 import ApplicationServices
 
-/// A borderless, click-through window placed exactly behind the Dock's glass, one level below the Dock.
-/// The Dock blurs and tints whatever lies behind it, so painting here colors the Dock itself.
+/// A borderless, click-through window along the Dock's screen edge, one level below the Dock.
+///
+/// It shows the glow twice from one image: as a soft floor of light spanning the whole edge of the screen,
+/// fading out before the top of the Dock's reserved area so it has no visible edge, and at full strength
+/// behind the Dock's glass, aligned pixel for pixel. The Dock reads as the brightest part of one light
+/// rather than a colored object sitting on the screen.
 final class DockBackdrop {
+    private enum Edge { case bottom, left, right }
+
     private let window: NSWindow
-    private let glowLayer = CALayer()
-    private let maskLayer = CALayer()
+    private let floorLayer = CALayer()
+    private let floorMask = CAGradientLayer()
+    private let pillLayer = CALayer()
+    private let pillMask = CALayer()
     private let locator = DockLocator()
     private var locateTimer: Timer?
     private var dockFrame: CGRect?
+    private var floorFrame: CGRect?
     private(set) var shown = false
 
-    /// How strongly the glow shows through the Dock's glass.
-    private let intensity: Float = 1.0
+    /// Strength of the floor light at the screen edge; it fades to nothing away from the edge.
+    private let floorIntensity: Float = 0.7
+    /// Strength behind the Dock's glass. A little brighter than the floor, but not so much it becomes an object.
+    private let dockIntensity: Float = 0.85
 
     init() {
         window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
@@ -29,19 +40,26 @@ final class DockBackdrop {
         let view = NSView()
         view.wantsLayer = true
         view.layer = CALayer()
-        glowLayer.contentsGravity = .resize
-        glowLayer.magnificationFilter = .linear
-        glowLayer.minificationFilter = .linear
-        glowLayer.opacity = intensity
-        glowLayer.mask = maskLayer
-        view.layer!.addSublayer(glowLayer)
+        for layer in [floorLayer, pillLayer] {
+            layer.contentsGravity = .resize
+            layer.magnificationFilter = .linear
+            layer.minificationFilter = .linear
+            view.layer!.addSublayer(layer)
+        }
+        floorMask.colors = [CGColor(gray: 0, alpha: CGFloat(floorIntensity)),
+                            CGColor(gray: 0, alpha: CGFloat(floorIntensity) * 0.4),
+                            CGColor(gray: 0, alpha: 0)]
+        floorMask.locations = [0, 0.45, 1]
+        floorLayer.mask = floorMask
+        pillLayer.mask = pillMask
+        pillLayer.opacity = dockIntensity
         window.contentView = view
     }
 
     /// Pixel size the glow should be rendered at. Deliberately low: it's soft by nature and scaled up.
     var renderSize: CGSize? {
-        guard let f = dockFrame else { return nil }
-        return CGSize(width: max(8, (f.width / 4).rounded()), height: max(4, (f.height / 4).rounded()))
+        guard let f = floorFrame else { return nil }
+        return CGSize(width: max(8, (f.width / 5).rounded()), height: max(4, (f.height / 5).rounded()))
     }
 
     func startTracking() {
@@ -57,14 +75,15 @@ final class DockBackdrop {
     func setContents(_ image: CGImage) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        glowLayer.contents = image
+        floorLayer.contents = image
+        pillLayer.contents = image
         CATransaction.commit()
     }
 
     func fade(in visible: Bool, duration: TimeInterval) {
         guard visible != shown else { return }
         shown = visible
-        if visible, dockFrame != nil { window.orderFrontRegardless() }
+        if visible, floorFrame != nil { window.orderFrontRegardless() }
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = duration
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -76,22 +95,57 @@ final class DockBackdrop {
     }
 
     private func relocate() {
-        let frame = locator.platterFrame()
-        guard frame != dockFrame else { return }
-        dockFrame = frame
-        guard let frame, NSScreen.screens.contains(where: { $0.frame.intersects(frame) }) else {
+        let dock = locator.platterFrame()
+        guard dock != dockFrame else { return }
+        dockFrame = dock
+        guard let dock, let screen = NSScreen.screens.first(where: { $0.frame.intersects(dock) }) else {
+            floorFrame = nil
             window.orderOut(nil)   // hidden Dock, or no Accessibility access yet
             return
         }
-        window.setFrame(frame, display: false)
+
+        let (floor, edge) = Self.floor(for: dock, on: screen)
+        floorFrame = floor
+        window.setFrame(floor, display: false)
+
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        let bounds = CGRect(origin: .zero, size: frame.size)
-        glowLayer.frame = bounds
-        maskLayer.frame = bounds
-        maskLayer.contents = Self.featheredMask(size: frame.size, scale: window.backingScaleFactor)
+        let bounds = CGRect(origin: .zero, size: floor.size)
+        floorLayer.frame = bounds
+        floorMask.frame = bounds
+        switch edge {
+        case .bottom: floorMask.startPoint = CGPoint(x: 0.5, y: 0); floorMask.endPoint = CGPoint(x: 0.5, y: 1)
+        case .left: floorMask.startPoint = CGPoint(x: 0, y: 0.5); floorMask.endPoint = CGPoint(x: 1, y: 0.5)
+        case .right: floorMask.startPoint = CGPoint(x: 1, y: 0.5); floorMask.endPoint = CGPoint(x: 0, y: 0.5)
+        }
+
+        // Behind the glass: the same image, cropped to exactly where the Dock sits.
+        let pill = dock.offsetBy(dx: -floor.minX, dy: -floor.minY)
+        pillLayer.frame = pill
+        pillLayer.contentsRect = CGRect(x: pill.minX / floor.width, y: pill.minY / floor.height,
+                                        width: pill.width / floor.width, height: pill.height / floor.height)
+        pillMask.frame = CGRect(origin: .zero, size: pill.size)
+        pillMask.contents = Self.featheredMask(size: pill.size, scale: window.backingScaleFactor)
         CATransaction.commit()
         if shown { window.orderFrontRegardless() }
+    }
+
+    /// The strip along the screen edge the Dock lives on, as deep as the Dock's reserved area.
+    private static func floor(for dock: CGRect, on screen: NSScreen) -> (CGRect, Edge) {
+        let f = screen.frame, v = screen.visibleFrame
+        let gaps: [(Edge, CGFloat)] = [(.bottom, dock.minY - f.minY), (.left, dock.minX - f.minX), (.right, f.maxX - dock.maxX)]
+        let edge = gaps.min { $0.1 < $1.1 }!.0
+        switch edge {
+        case .bottom:
+            let top = max(dock.maxY, v.minY)
+            return (CGRect(x: f.minX, y: f.minY, width: f.width, height: top - f.minY), edge)
+        case .left:
+            let right = max(dock.maxX, v.minX)
+            return (CGRect(x: f.minX, y: f.minY, width: right - f.minX, height: f.height), edge)
+        case .right:
+            let left = min(dock.minX, v.maxX)
+            return (CGRect(x: left, y: f.minY, width: f.maxX - left, height: f.height), edge)
+        }
     }
 
     /// A rounded rect with softly faded edges, so the color never shows past the Dock's glass.

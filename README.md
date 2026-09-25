@@ -2,10 +2,10 @@
 
 Your Dock, in the colors of what you're playing.
 
-Orb is a tiny macOS app with no window, no menu and no controls. While Apple Music plays, the Dock's background takes on the colors of the current album artwork, as a slow, blurred swirl of the cover itself.
+Orb is a tiny macOS app with no window, no menu and no controls. While Apple Music plays, the bottom of your screen and the Dock take on the colors of the current album artwork, as a slow, blurred swirl of the cover itself.
 
-- **Music starts:** the Dock gently fades into the album's colors.
-- **Song changes:** the new cover blooms out from the middle of the Dock and melts into the old one.
+- **Music starts:** the Dock and the screen edge gently fade into the album's colors.
+- **Song changes:** the new cover blooms out from the middle of the screen and melts into the old one.
 - **Music pauses:** the motion settles, and after two seconds the Dock fades back to normal.
 - **Music stops or quits:** the Dock returns to normal.
 
@@ -34,7 +34,14 @@ On first launch macOS asks for two permissions:
 
 ## How it works
 
-macOS doesn't let apps draw inside the Dock. The Dock's background, though, is translucent glass that blurs whatever sits behind it. Orb places a borderless, click-through window exactly behind that glass, one level below the Dock, and paints there. The Dock's own glass blurs and tints the colors, so the Dock itself looks recolored. Nothing in the system is modified.
+macOS doesn't let apps draw inside the Dock. The Dock's background, though, is translucent glass that blurs whatever sits behind it. Orb places a borderless, click-through window along the Dock's edge of the screen, one level below the Dock, and paints there. Nothing in the system is modified.
+
+The glow is shown twice from the same image:
+
+- **A floor of light** across the whole screen edge. It's strongest at the edge and fades to nothing before the top of the area macOS reserves for the Dock, so it has no visible edge and never tints app windows.
+- **Behind the Dock's glass**, aligned exactly with the floor and a little brighter. The glass blurs and tints it, so the Dock reads as the brightest part of one continuous light rather than a colored object.
+
+`floorIntensity` and `dockIntensity` in `Sources/DockBackdrop.swift` control the two strengths.
 
 - **Music state** comes from Apple Music's `com.apple.Music.playerInfo` distributed notification, which is instant and costs nothing.
 - **Artwork** is read from Music via AppleScript. Streamed Apple Music songs that aren't in your library don't expose artwork to scripts, so for those Orb looks up the official cover with Apple's public iTunes Search API.
@@ -64,7 +71,7 @@ Songs in your library never leave your Mac. For streamed songs without local art
 | `Sources/Music.swift` | Apple Music state, artwork, catalog lookup |
 | `Sources/Swatch.swift` | Blurred artwork texture and per-hue saturation limits |
 | `Sources/Glow.swift` | Animation state and the flowing-color renderer |
-| `Sources/DockBackdrop.swift` | The window behind the Dock and Dock location |
+| `Sources/DockBackdrop.swift` | The floor-of-light window, the layer behind the Dock, and Dock location |
 | `Sources/Color.swift` | OKLab color conversions |
 | `Resources/Info.plist` | App metadata and permission descriptions |
 | `build.sh` | Builds, icons and signs `build/Orb.app` |
