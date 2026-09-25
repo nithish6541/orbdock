@@ -2,6 +2,10 @@
 
 Your Dock, in the colors of what you're playing.
 
+[![Orb demo: the Dock takes on the colors of each album as songs change](media/demo.gif)](media/demo.mp4)
+
+<sub>Click for the full-quality video. The now-playing cards were added to the video for context; Orb itself only colors the Dock.</sub>
+
 Orb is a tiny macOS app with no window, no menu and no controls. While Apple Music plays, the bottom of your screen and the Dock take on the colors of the current album artwork, as a slow, blurred swirl of the cover itself.
 
 - **Music starts:** the Dock and the screen edge gently fade into the album's colors.
@@ -83,3 +87,4 @@ Contributions are welcome through pull requests, which the maintainer reviews an
 | `Sources/Color.swift` | OKLab color conversions |
 | `Resources/Info.plist` | App metadata and permission descriptions |
 | `build.sh` | Builds, icons and signs `build/Orb.app` |
+| `media/` | Demo video and its GIF preview |
