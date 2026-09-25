@@ -31,6 +31,6 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Your Dock, in the colors of what you're playing.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Orb reads the album artwork of the song playing in Music so your Dock can take on its colors.</string>
+	<string>Orb reads the album artwork of the song playing in Music or Spotify so your Dock can take on its colors.</string>
 </dict>
 </plist>
