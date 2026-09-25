@@ -63,6 +63,14 @@ Songs in your library never leave your Mac. For streamed songs without local art
   Then relaunch Orb and allow the prompt.
 - With an auto-hiding Dock, the glow follows the Dock as it slides in and out but can trail it by a frame or two.
 
+## Contributing
+
+Contributions are welcome through pull requests, which the maintainer reviews and merges. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)
+
 ## Project layout
 
 | File | Purpose |
