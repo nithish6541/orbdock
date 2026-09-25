@@ -6,7 +6,7 @@ Your Dock, in the colors of what you're playing.
 
 <sub>Click for the full-quality video. The now-playing cards were added to the video for context; Orb itself only colors the Dock.</sub>
 
-Orb is a tiny macOS app with no window, no menu and no controls. While Apple Music plays, the bottom of your screen and the Dock take on the colors of the current album artwork, as a slow, blurred swirl of the cover itself.
+Orb is a tiny macOS app with no window, no menu and no controls. While Apple Music or Spotify plays, the bottom of your screen and the Dock take on the colors of the current album artwork, as a slow, blurred swirl of the cover itself.
 
 - **Music starts:** the Dock and the screen edge gently fade into the album's colors.
 - **Song changes:** the new cover blooms out from the middle of the screen and melts into the old one.
@@ -16,7 +16,7 @@ Orb is a tiny macOS app with no window, no menu and no controls. While Apple Mus
 ## Requirements
 
 - macOS 14 or later (designed for macOS 26's Liquid Glass Dock)
-- Apple Music
+- Apple Music or Spotify
 - Xcode or the Xcode Command Line Tools, to build
 
 ## Build and run
@@ -30,7 +30,7 @@ This compiles `build/Orb.app` and opens it. To keep it around, drag `build/Orb.a
 On first launch macOS asks for two permissions:
 
 1. **Accessibility** (System Settings → Privacy & Security → Accessibility). Orb uses it only to find where the Dock is drawn. Nothing appears until this is on.
-2. **Automation → Music**, to read the current song and its artwork.
+2. **Automation → Music** and/or **Automation → Spotify**, to read the current song and its artwork. Each is asked for the first time Orb sees that app playing.
 
 **To turn Orb off**, open it again: it fades out and quits. You can also quit it from Activity Monitor or with `pkill -x Orb`.
 
@@ -47,14 +47,14 @@ The glow is shown twice from the same image:
 
 `floorIntensity` and `dockIntensity` in `Sources/DockBackdrop.swift` control the two strengths.
 
-- **Music state** comes from Apple Music's `com.apple.Music.playerInfo` distributed notification, which is instant and costs nothing.
-- **Artwork** is read from Music via AppleScript. Streamed Apple Music songs that aren't in your library don't expose artwork to scripts, so for those Orb looks up the official cover with Apple's public iTunes Search API.
+- **Music state** comes from Apple Music's `com.apple.Music.playerInfo` and Spotify's `com.spotify.client.PlaybackStateChanged` distributed notifications, which are instant and cost nothing. If both apps are open, whichever started playing most recently colors the Dock.
+- **Artwork** is read via AppleScript: Music hands over the image itself, Spotify hands over a URL to its cover, which Orb downloads. Streamed Apple Music songs that aren't in your library don't expose artwork to scripts, so for those (or if Spotify's cover can't be fetched) Orb looks up the official cover with Apple's public iTunes Search API.
 - **The glow** is a 20×20 blurred copy of the cover in the OKLab color space. It's sampled through a slowly drifting, tilting window and bent by flowing noise. Saturation is capped per hue so blues and violets don't overpower warm colors. It's rendered at a quarter of the Dock's resolution and scaled up, which works out to roughly 2% CPU while playing.
 - **The Dock's position and size** come from the Accessibility API.
 
 ## Privacy
 
-Songs in your library never leave your Mac. For streamed songs without local artwork, Orb sends the song title, artist and album to `itunes.apple.com` to find the cover. Nothing else is collected or sent.
+Songs in your library never leave your Mac. For Spotify, Orb downloads the cover from the artwork URL Spotify provides (Spotify's image CDN). For streamed songs without local artwork, Orb sends the song title, artist and album to `itunes.apple.com` to find the cover. Nothing else is collected or sent.
 
 ## Notes
 
@@ -80,7 +80,7 @@ Contributions are welcome through pull requests, which the maintainer reviews an
 | File | Purpose |
 | --- | --- |
 | `Sources/main.swift` | App lifecycle, reacting to music changes, frame loop |
-| `Sources/Music.swift` | Apple Music state, artwork, catalog lookup |
+| `Sources/Music.swift` | Apple Music and Spotify state, artwork, catalog lookup |
 | `Sources/Swatch.swift` | Blurred artwork texture and per-hue saturation limits |
 | `Sources/Glow.swift` | Animation state and the flowing-color renderer |
 | `Sources/DockBackdrop.swift` | The floor-of-light window, the layer behind the Dock, and Dock location |
